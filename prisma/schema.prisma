@@ -1,0 +1,47 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String      @id @default(uuid())
+  name       String
+  email      String      @unique
+  password   String
+  photo      String?     @default("")
+  phone      String?     @default("+639")
+  bio        String?     @default("bio")
+  role       Role        @default(STAFF) // admin, sub admin, staff, suspended
+  isVerified Boolean     @default(false)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  token      Token?
+  userAgents UserAgent[]
+}
+
+model UserAgent {
+  id        String @id @default(uuid())
+  userAgent String
+  user      User   @relation(fields: [userId], references: [id])
+  userId    String
+}
+
+model Token {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  token     String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}
+
+enum Role {
+  ADMIN
+  SUB_ADMIN
+  STAFF
+  SUSPENDED
+}
