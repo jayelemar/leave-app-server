@@ -52,3 +52,43 @@ export const protect = asyncHandler(async (
   }
 });
 
+export const adminOnly = asyncHandler(async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  if (req.user && req.user.role === "ADMIN") {
+    next();
+  } else {
+    res.status(401);
+    throw new Error("Not authorized as admin.");
+  }
+});
+
+export const subAdminOnly = asyncHandler(async ( 
+  req:AuthenticatedRequest, 
+  res:Response, 
+  next: NextFunction
+) => {
+  const user = req.user
+  if (user && (user.role === "ADMIN" || user.role === "SUB_ADMIN")) {
+    next()
+  } else {
+    res.status(401)
+    throw new Error("Not authorized as sub admin.");
+  }
+});
+
+export const verifiedOnly = asyncHandler(async ( 
+  req:AuthenticatedRequest, 
+  res:Response, 
+  next: NextFunction
+) => {
+  if (req.user && req.user.isVerified) {
+    next()
+  } else {
+    res.status(401)
+    throw new Error("Not authorized, account is not verified.");
+  }
+});
+
