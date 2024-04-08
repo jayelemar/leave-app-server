@@ -23,6 +23,13 @@ model User {
   userAgents UserAgent[]
 }
 
+enum Role {
+  ADMIN
+  SUB_ADMIN
+  STAFF
+  SUSPENDED
+}
+
 model UserAgent {
   id        String @id @default(uuid())
   userAgent String
@@ -37,11 +44,4 @@ model Token {
   token     String
   createdAt DateTime @default(now())
   expiresAt DateTime
-}
-
-enum Role {
-  ADMIN
-  SUB_ADMIN
-  STAFF
-  SUSPENDED
 }
