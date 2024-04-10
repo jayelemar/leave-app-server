@@ -3,12 +3,13 @@ import asyncHandler from 'express-async-handler'
 import { LoginUserSchema, RegisterUserSchema } from '../schema/userSchema';
 import { prisma } from '..';
 import { compareSync, hashSync } from 'bcrypt';
-import { generateToken, sendHttpOnlyCookie } from '../utils/userUtils';
+import { generateToken, hashToken, sendHttpOnlyCookie } from '../utils/userUtils';
 import parser from 'ua-parser-js'
 import { AuthenticatedRequest } from '../middlewares/authMiddleware';
-import { FRONTEND_URL, JWT_SECRET } from '../secrets';
+import { AWS_EMAIL_USER, FRONTEND_URL, JWT_SECRET } from '../secrets';
 import * as jwt from 'jsonwebtoken' 
 import { sendAutoEmail } from '../utils/sendEmail';
+import crypto from 'crypto'
 
 export const registerUser = asyncHandler(async ( req:Request, res:Response ) => {
 // Validation
@@ -313,4 +314,192 @@ export const sendEmail = asyncHandler(async ( req:Request, res:Response ) => {
     throw new Error("Email not send, please try again.");
   }
 });
+
+export const sendVerificationEmail = asyncHandler(async ( 
+  req:AuthenticatedRequest, res:Response 
+) => {
+
+  const userId = req.user?.id
+  const user = await prisma.user.findUnique({
+    where: { id: userId }
+  })
+// Validation
+  if (!userId) {
+    res.status(404);
+    throw new Error('User ID not found.');
+  }
+  if (!user) {
+    res.status(404)
+    throw new Error("User not found.");
+  }
+  if (user.isVerified) {
+    res.status(400)
+    throw new Error("User is already verified.");
+  }
+
+// Check if token exist in DB
+  let token = await  prisma.token.findFirst({
+    where: { userId: userId}
+  })
+// delete token if exist in DB
+  if(token) {
+    await prisma.token.delete({
+      where: { userId: userId}
+    })
+  }
+// Create Verification Token 
+  const verificationToken = crypto.randomBytes(32).toString("hex") + userId
+  console.log(verificationToken);
+
+// Hash token and save to DB
+  const hashedToken = hashToken(verificationToken)
+  await prisma.token.create({
+    data: {
+      userId: userId,
+      verificationToken: hashedToken,
+      createdAt: new Date(), 
+      expiresAt: new Date(Date.now() + 60 * (60 * 1000)), // 60 minutes
+    },
+  });
+
+// Create Verification URL
+  const verificationURL = `${FRONTEND_URL}/verify/${verificationToken}`
+
+// Send Email
+  const subject = "Verify your Account"
+  const send_to = user.email
+  const sent_from = AWS_EMAIL_USER!
+  const reply_to = "no-reply@elemar.site"
+  const template = "verifyEmail"
+  const name = user.name
+  const link = verificationURL
+
+  try {
+    await sendAutoEmail(
+      subject,
+      send_to,
+      sent_from,
+      reply_to,
+      template,
+      name,
+      link
+    )
+    res.status(200).json({
+      message: "Verification Email Sent Successfully"
+    })
+  } catch (error) {
+    res.status(500)
+    throw new Error("Email not send, please try again.");
+  }
+
+});
+
+export const verifyUser = asyncHandler(async ( req:Request, res:Response ) => {
+  const { verificationToken } = req.params
+
+  const hashedToken = hashToken(verificationToken)
+  const userToken = await prisma.token.findFirst({
+    where: { 
+      verificationToken: hashedToken,
+      expiresAt: { gt: new Date() }// greater than current date
+    }
+  })
+  if(!userToken) {
+    res.status(404)
+    throw new Error("Invalid or Expired Token");
+  }
+  // Find User
+  const user = await prisma.user.findFirst({
+    where: { id: userToken.userId }
+  })
+  if(user?.isVerified) {
+    res.status(400)
+    throw new Error("User is already verified");
+  }
+
+  // Now Verify the user
+  await prisma.user.update({
+    where:{ id: user?.id },
+    data: {
+      isVerified: true
+    }
+  })
+
+  res.status(200).json({ message: "Account verification Successful"})
+});
+
+export const forgotPassword = asyncHandler(async ( req:Request, res:Response ) => {
+  const userEmail = req.body.email
+  
+  const user = await prisma.user.findUnique({
+    where: { email: userEmail }
+  })
+
+  if(!user) {
+    res.status(404)
+    throw new Error("No user with this email");
+  }
+
+// Same as verification Email process
+// Check if token exist in DB
+  const token = await prisma.token.findFirst({
+    where: { userId: user.id }
+  })
+// delete token if exist in DB
+  if(token) {
+    await prisma.token.delete({
+      where: { userId: user.id }
+    })
+  }
+// Create reset token
+  const resetToken = crypto.randomBytes(32).toString("hex") + user.id
+  console.log(resetToken);
+
+  // Hash token and save to DB
+  const hashedToken = hashToken(resetToken)
+  await prisma.token.create({
+    data: {
+      userId: user.id,
+      resetToken: hashedToken,
+      createdAt: new Date(), 
+      expiresAt: new Date(Date.now() + 60 * (60 * 1000)), // 60 minutes
+    },
+  });
+
+  // Create Reset URL
+  const resetURL = `${FRONTEND_URL}/forgot-password/${resetToken}`
+
+  // Send Email
+  const subject = "Reset Password Request"
+  const send_to = user.email
+  const sent_from = AWS_EMAIL_USER!
+  const reply_to = "no-reply@elemar.site"
+  const template = "forgotPassword"
+  const name = user.name
+  const link = resetURL
+
+  try {
+    await sendAutoEmail(
+      subject,
+      send_to,
+      sent_from,
+      reply_to,
+      template,
+      name,
+      link
+    )
+    res.status(200).json({
+      message: "Reset Password Email Sent Successfully"
+    })
+  } catch (error) {
+    res.status(500)
+    throw new Error("Email not send, please try again.");
+  }
+});
+
+export const resetPassword = asyncHandler(async ( req:Request, res:Response ) => {
+  res.send("Reset Password is working")
+});
+
+
 

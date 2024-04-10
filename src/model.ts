@@ -1,57 +1,34 @@
 // const mongoose = require("mongoose")
 
-// const userSchema = mongoose.Schema(
+// const tokenSchema = mongoose.Schema(
 //   {
-//     name: {
+//     userId: {
+//       type: mongoose.Schema.Types.ObjectId,
+//       required: true
+//       ref: "user",
+//     },
+//     verificationToken: {
 //       type: String,
-//       required: [true, "Please add a name"]
-//     }
-//     email: {
+//       default: "",
+//     },
+//     resetToken: {
 //       type: String,
-//       required: [true, "Please add a email"],
-//       unique: true,
-//       trim: true,
-//       match: [
-//         /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/,
-//         "Please enter a valid emaial",
-//       ],
-//       password: {
-//         type: String,
-//         required: [true, "Please add a password"]
-//       },
-//       photo: {
-//         type: String,
-//         default: ""
-//       },
-//       phone: {
-//         type: String,
-//         default: "+639"
-//       },
-//       bio: {
-//         type: String,
-//         default: "bio"
-//       },
-//       role: {
-//         type: String,
-//         required: true,
-//         default: "employee"  // admin, manager , employee, suspended
-//       },
-//       isVerified: {
-//         type: Boolean,
-//         default: false
-//       }
-//       userAgent: {
-//         type: Array,
-//         required: true,
-//         default:[]
-//       }
-
-//     }
-//   }, {
-//     timestamps: true,
-//     minimize: false
-//   }
+//       default: "",
+//     },
+//     loginToken: {
+//       type: String,
+//       default: "",
+//     },
+//     createdAt: {
+//       type: Date,
+//       required: true,
+//     },
+//     expiresAt: {
+//       type: Date,
+//       required: true,
+//     },
+//   },
 // )
 
-// const User = mongoose.model("User", UserSchema)
-// module.exports = User
+// const Token = mongoose.model("Token", TokenSchema)
+// module.exports = Token
