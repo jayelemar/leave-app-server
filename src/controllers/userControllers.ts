@@ -1,15 +1,20 @@
 import {Response, Request} from 'express'
 import asyncHandler from 'express-async-handler'
-import { LoginUserSchema, RegisterUserSchema } from '../schema/userSchema';
-import { prisma } from '..';
 import { compareSync, hashSync } from 'bcrypt';
-import { generateToken, hashToken, sendHttpOnlyCookie } from '../utils/userUtils';
 import parser from 'ua-parser-js'
+import * as jwt from 'jsonwebtoken' 
+import crypto from 'crypto'
+import Cryptr from 'cryptr'
+
+import { prisma } from '..';
+import { LoginUserSchema, RegisterUserSchema } from '../schema/userSchema';
+import { generateToken, hashToken, sendHttpOnlyCookie } from '../utils/userUtils';
 import { AuthenticatedRequest } from '../middlewares/authMiddleware';
 import { AWS_EMAIL_USER, FRONTEND_URL, JWT_SECRET } from '../secrets';
-import * as jwt from 'jsonwebtoken' 
 import { sendAutoEmail } from '../utils/sendEmail';
-import crypto from 'crypto'
+import { Token } from '@prisma/client';
+
+const cryptr = new Cryptr(process.env.CRYPTR_KEY!, {saltLength: 10});
 
 export const registerUser = asyncHandler(async ( req:Request, res:Response ) => {
 // Validation
@@ -76,6 +81,46 @@ export const loginUser = asyncHandler(async ( req:Request, res:Response ) => {
   }
 
   // Trigger 2FA for unknown user Agent
+  const ua = parser(req.headers['user-agent']);
+  const thisUserAgent: string = ua.ua;
+  console.log(thisUserAgent);
+
+  const allowedAgents = await prisma.userAgent.findMany({
+    where: { id: user.id },
+  })
+  // check if thisUserAgent is on the allowedAgents
+  const isAllowedAgent = allowedAgents.some(agent => agent.userAgent === thisUserAgent);
+
+  // If not allowed trigger 2 Factor Auth
+  if(!isAllowedAgent) {
+    // Generate 6 digit code
+    const loginCode = Math.floor(100000 + Math.random()*900000)
+    console.log(loginCode);
+    // Encrypt login code before saving to DB
+    const encrptedLoginCode = cryptr.encrypt(loginCode.toString())
+
+    // Check if user have a token delete it.
+    let userToken = await prisma.token.findFirst({
+      where: { userId: user.id }
+    })
+  
+    if( userToken ) {
+      await prisma.token.delete({
+        where: { userId: user.id }
+      })
+    }
+     // Save token to DB
+    await prisma.token.create({
+      data: {
+        userId: user.id,
+        loginToken: encrptedLoginCode,
+        createdAt: new Date,
+        expiresAt: new Date (Date.now() + (60 * 60 * 1000)), // 60mins
+      }
+    })
+    res.status(400)
+    throw new Error("Check your email for login code.");
+  }
 
   // Generate Token
   const token = generateToken(user.id)
@@ -498,8 +543,187 @@ export const forgotPassword = asyncHandler(async ( req:Request, res:Response ) =
 });
 
 export const resetPassword = asyncHandler(async ( req:Request, res:Response ) => {
-  res.send("Reset Password is working")
+  const { resetToken } = req.params
+  const newPassword = req.body.password
+
+
+  //Same as verifyUser function
+  const hashedToken = hashToken(resetToken)
+  const userToken = await prisma.token.findFirst({
+    where: { 
+      resetToken: hashedToken,
+      expiresAt: { gt: new Date() }// greater than current date
+    }
+  })
+  if(!userToken) {
+    res.status(404)
+    throw new Error("Invalid or Expired Token");
+  }
+  // Find User
+  const user = await prisma.user.findFirst({
+    where: { id: userToken.userId }
+  })
+  // Reset Password
+  await prisma.user.update({
+    where:{ id: user?.id },
+    data: {
+      password: hashSync(newPassword, 10)
+    }
+  })
+
+  res.status(200).json({ message: "Password has been successfully reset. Please log in"})
 });
+
+export const changePassword = asyncHandler(async ( req:AuthenticatedRequest, res:Response ) => {
+  const { oldPassword, newPassword } = req.body
+  const userId = req.user?.id
+
+  const user = await prisma.user.findFirst({
+    where: {id: userId}
+  })
+
+  if(!user) {
+    res.status(404)
+    throw new Error("User not found. please sign up");
+  }
+
+  if(!oldPassword || !newPassword) {
+    res.status(400)
+    throw new Error("Please enter old and new password");
+  }
+// Check if old password is correct
+  const passwordIsCorrect = await compareSync(oldPassword, user.password)
+
+//Save new password
+  if(user && passwordIsCorrect) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        password: hashSync(newPassword, 10)
+      }
+    })
+    res.status(200).json({
+      message: "Your password has been changed successfully. please proceed to log in"
+    })
+  } else {
+    res.status(400)
+    throw new Error("old password is Incorrect");
+  }
+
+//Create an email to notify user that password have change
+  // Check if token exist in DB
+  const token = await prisma.token.findFirst({
+    where: { userId: user.id }
+  })
+  // delete token if exist in DB
+  if(token) {
+    await prisma.token.delete({
+      where: { userId: user.id }
+    })
+  }
+  // Create reset token
+  const resetToken = crypto.randomBytes(32).toString("hex") + user.id
+  console.log(resetToken);
+
+  // Hash token and save to DB
+  const hashedToken = hashToken(resetToken)
+  await prisma.token.create({
+    data: {
+      userId: user.id,
+      resetToken: hashedToken,
+      createdAt: new Date(), 
+      expiresAt: new Date(Date.now() + 60 * (60 * 1000)), // 60 minutes
+    },
+  });
+
+  // Create Reset URL
+  const resetURL = `${FRONTEND_URL}/forgot-password/${resetToken}`
+
+  // Send Email
+  const subject = "Change Password Notification"
+  const send_to = user.email
+  const sent_from = AWS_EMAIL_USER!
+  const reply_to = "no-reply@elemar.site"
+  const template = "changePassword"
+  const name = user.name
+  const link = resetURL
+
+  try {
+    await sendAutoEmail(
+      subject,
+      send_to,
+      sent_from,
+      reply_to,
+      template,
+      name,
+      link
+    )
+    res.status(200).json({
+      message: "Change Password Notification Email Sent Successfully"
+    })
+  } catch (error) {
+    res.status(500)
+    throw new Error("Email not send, please try again.");
+  }
+});
+
+export const sendLoginCode = asyncHandler(async ( req:Request, res:Response ) => {
+  const { email } = req.params
+  const user = await prisma.user.findUnique({
+    where: { email }
+  })
+  if(!user) {
+    res.status(404)
+    throw new Error("User not found");
+  }
+
+  // Find loginToken in DB
+  let userToken = await prisma.token.findFirst({
+    where: { 
+        userId: user.id,
+        expiresAt: {
+            gt: new Date()
+        }
+    },
+  });
+
+  if (!userToken) {
+    res.status(404)
+    throw new Error("Invalid or Expired Token, please login again");
+  }
+
+  const encryptedLoginCode = userToken.loginToken
+  const decryptedLoginCode = cryptr.decrypt(encryptedLoginCode)
+  console.log(decryptedLoginCode);
+
+  // Send Login Code
+  const subject = "Login Access Code - LOGO"
+  const send_to = email
+  const sent_from = AWS_EMAIL_USER!
+  const reply_to = "no-reply@elemar.site"
+  const template = "loginCode"
+  const name = user.name
+  const link = decryptedLoginCode
+
+  try {
+    await sendAutoEmail(
+      subject,
+      send_to,
+      sent_from,
+      reply_to,
+      template,
+      name,
+      link
+    )
+    res.status(200).json({
+      message: `An access code has been sent to ${email}.`
+    })
+  } catch (error) {
+    res.status(500)
+    throw new Error("Email not send, please try again.");
+  }
+});
+
 
 
 
