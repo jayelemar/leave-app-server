@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { deleteUser, forgotPassword, getUser, getUsers, loginStatus, loginUser, logoutUser, registerUser, resetPassword, sendEmail, sendVerificationEmail, updateUser, upgradeUser, verifyUser } from '../controllers/userControllers'
+import { changePassword, deleteUser, forgotPassword, getUser, getUsers, loginStatus, loginUser, logoutUser, registerUser, resetPassword, sendEmail, sendLoginCode, sendVerificationEmail, updateUser, upgradeUser, verifyUser } from '../controllers/userControllers'
 import { adminOnly, protect, subAdminOnly } from '../middlewares/authMiddleware'
 
 const userRoutes:Router = Router()
@@ -17,6 +17,8 @@ userRoutes.post('/send-email', protect, sendEmail)
 userRoutes.post('/send-verification-email', protect, sendVerificationEmail)
 userRoutes.patch('/verify-user/:verificationToken', verifyUser)
 userRoutes.post('/forgot-password', forgotPassword)
-userRoutes.put('/reset-password', resetPassword)
+userRoutes.put('/reset-password/:resetToken', resetPassword)
+userRoutes.patch('/change-password', protect, changePassword)
+userRoutes.post('/send-login-code/:email', sendLoginCode)
 
 export default userRoutes
