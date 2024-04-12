@@ -12,7 +12,6 @@ import { generateToken, hashToken, sendHttpOnlyCookie } from '../utils/userUtils
 import { AuthenticatedRequest } from '../middlewares/authMiddleware';
 import { AWS_EMAIL_USER, FRONTEND_URL, JWT_SECRET } from '../secrets';
 import { sendAutoEmail } from '../utils/sendEmail';
-import { Token } from '@prisma/client';
 
 const cryptr = new Cryptr(process.env.CRYPTR_KEY!, {saltLength: 10});
 
@@ -119,7 +118,7 @@ export const loginUser = asyncHandler(async ( req:Request, res:Response ) => {
       }
     })
     res.status(400)
-    throw new Error("Check your email for login code.");
+    throw new Error("new browser or device detected.");
   }
 
   // Generate Token
@@ -724,6 +723,77 @@ export const sendLoginCode = asyncHandler(async ( req:Request, res:Response ) =>
   }
 });
 
+export const loginWithCode = asyncHandler(async ( req:Request, res:Response ) => {
+  const { email } = req.params
+  const { loginCode } = req.body
+
+  const user = await prisma.user.findUnique({
+    where: { email }
+  })
+
+  if(!user) {
+    res.status(404)
+    throw new Error("User not found");
+  }
+
+  if(!loginCode) {
+    res.status(404)
+    throw new Error("No login code found");
+  }
+
+  //Find User Login Token
+  const userToken = await prisma.token.findFirst({
+    where: { 
+      userId: user.id,
+      expiresAt: {
+        gt: new Date()
+      }
+    }
+  })
+
+  if(!userToken) {
+    res.status(404)
+    throw new Error("Invalid or expired token, please login again");
+  }
+
+  const decryptedLoginCode = cryptr.decrypt(userToken.loginToken)
+
+  if(loginCode !== decryptedLoginCode) {
+    res.status(400);
+    throw new Error("Incorrect login code, please try again");
+  } else {
+    // Register User Agent
+    const ua = parser(req.headers["user-agent"])
+    const thisUserAgent = ua.ua
+
+    // Push the new user to the array of user agents
+    await prisma.userAgent.create({
+      data: {
+        userAgent: thisUserAgent,
+        user:  {
+          connect: { id: user.id }
+        }
+      }
+    })
+
+    // Generate Token
+    const token = generateToken(user.id)
+
+  // Send HTTP-only cookie
+    sendHttpOnlyCookie(res, token)
+  
+    if(user) {
+      const { ...userData } = user
+      res.status(200).json({
+        ...userData,
+        token,
+      })
+    } else {
+      res.status(400)
+      throw new Error("Invalid user data.")
+    }
+  }
+});
 
 
 

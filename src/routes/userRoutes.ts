@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { changePassword, deleteUser, forgotPassword, getUser, getUsers, loginStatus, loginUser, logoutUser, registerUser, resetPassword, sendEmail, sendLoginCode, sendVerificationEmail, updateUser, upgradeUser, verifyUser } from '../controllers/userControllers'
+import { changePassword, deleteUser, forgotPassword, getUser, getUsers, loginStatus, loginUser, loginWithCode, logoutUser, registerUser, resetPassword, sendEmail, sendLoginCode, sendVerificationEmail, updateUser, upgradeUser, verifyUser } from '../controllers/userControllers'
 import { adminOnly, protect, subAdminOnly } from '../middlewares/authMiddleware'
 
 const userRoutes:Router = Router()
@@ -20,5 +20,6 @@ userRoutes.post('/forgot-password', forgotPassword)
 userRoutes.put('/reset-password/:resetToken', resetPassword)
 userRoutes.patch('/change-password', protect, changePassword)
 userRoutes.post('/send-login-code/:email', sendLoginCode)
+userRoutes.post('/login-with-code/:email', loginWithCode)
 
 export default userRoutes
