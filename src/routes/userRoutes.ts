@@ -1,6 +1,8 @@
 import { Router } from 'express'
-import { changePassword, deleteUser, forgotPassword, getUser, getUsers, loginStatus, loginUser, loginWithCode, logoutUser, registerUser, resetPassword, sendEmail, sendLoginCode, sendVerificationEmail, updateUser, upgradeUser, verifyUser } from '../controllers/userControllers'
 import { adminOnly, protect, subAdminOnly } from '../middlewares/authMiddleware'
+import { changePassword, deleteUser, forgotPassword, getUser, getUsers, loginStatus, loginUser, loginWithCode, logoutUser, registerUser, resetPassword, updateUser, upgradeUser, verifyUser } from '../controllers/user'
+
+import { sendEmail, sendLoginCode, sendVerificationEmail } from '../controllers/mail'
 
 const userRoutes:Router = Router()
 
