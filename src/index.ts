@@ -4,7 +4,7 @@ import bodyParser from 'body-parser'
 import cookieParser from 'cookie-parser'
 import cors from 'cors'
 import rootRouter from './routes'
-import { errorHandler } from './middlewares/errorMiddleware'
+import { errorHandler } from './middlewares/error/errorMiddleware'
 import { PrismaClient } from '@prisma/client'
 
 const app: Express = express()

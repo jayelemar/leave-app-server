@@ -1,6 +1,6 @@
 import { Router } from 'express'
-import { protect } from '../middlewares/authMiddleware'
 import { sendEmail, sendLoginCode, sendVerificationEmail } from '../controllers/mail'
+import { protect } from '../middlewares/auth'
 
 const userRoutes: Router = Router()
 
