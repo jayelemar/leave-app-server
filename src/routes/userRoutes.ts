@@ -1,5 +1,4 @@
 import { Router } from 'express'
-import { adminOnly, protect, subAdminOnly } from '../middlewares/authMiddleware'
 import {
   changePassword,
   deleteUser,
@@ -16,6 +15,7 @@ import {
   upgradeUser,
   verifyUser,
 } from '../controllers/user'
+import { adminOnly, protect, subAdminOnly } from '../middlewares/auth'
 
 const userRoutes: Router = Router()
 

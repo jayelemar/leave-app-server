@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from 'express'
-import { NODE_ENV } from '../secrets'
+import { NODE_ENV } from '../../secrets'
 
 const errorHandler = (err: Error, req: Request, res: Response, next: NextFunction) => {
   const statusCode = res.statusCode || 500

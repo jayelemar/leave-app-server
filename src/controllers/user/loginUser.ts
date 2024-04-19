@@ -2,8 +2,9 @@ import { Response, Request } from "express";
 import asyncHandler from "express-async-handler";
 import { prisma } from "../..";
 import { generateToken, sendHttpOnlyCookie } from "../../utils/userUtils";
-import { LoginUserSchema } from "../../schema/userSchema";
+
 import { compareSync } from "bcrypt";
+import { LoginUserSchema } from "../../schema/auth/LoginUserSchema";
 // import parser from "ua-parser-js";
 // import Cryptr from "cryptr";
 

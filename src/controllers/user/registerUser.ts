@@ -1,10 +1,10 @@
 import { Response, Request } from 'express'
 import asyncHandler from 'express-async-handler'
-import { RegisterUserSchema } from '../../schema/userSchema'
 import { prisma } from '../..'
 import parser from 'ua-parser-js'
 import { hashSync } from 'bcrypt'
 import { generateToken, sendHttpOnlyCookie } from '../../utils/userUtils'
+import { RegisterUserSchema } from '../../schema/auth/RegisterUserSchema'
 
 export const registerUser = asyncHandler(async (req: Request, res: Response) => {
   // Validation
