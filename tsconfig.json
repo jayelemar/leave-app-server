@@ -8,7 +8,7 @@
     "module": "commonjs",
     "rootDir": "./src",
     "sourceMap": true,
-    "lib": ["ESNext"],
+    "lib": ["ESNext"]
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "build"]
